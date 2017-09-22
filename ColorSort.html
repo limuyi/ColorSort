@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+    
+    <head>
+        <meta charset="utf-8" />
+        <title>
+            ColorSort
+        </title>
+    </head>
+    
+    <body>
+        <h1>
+            Color Sort
+        </h1>
+        <canvas id="canvas" width="500" height="500">
+        </canvas>
+        <div><p></p></div>
+        <div>
+            <form>
+                <div>
+                    <input id="init" type="button" name="init" value="rest" />
+                    <input id="shuffle" type="button" name="shuffle" value="shuffle" />
+                    <input id="insert" type="button" name="insert" value="Insert" />
+                    <input id="bubble" type="button" name="bubble" value="Bubble" />
+                    <input id="shell" type="button" name="shell" value="Shell" />
+                    <input id="quick" type="button" name="quick" value="Quick" />
+                </div>
+                <div><p></p></div>
+                <div>
+                    <input id="to5x" type="button" name="to5x" value="to5x" />
+                    <input id="to25x" type="button" name="to25x" value="to25x" />
+                    <input id="to50x" type="button" name="to50x" value="to50x" />
+                </div>
+            </form>
+        </div>
+        <script>
+            var box = 1;
+            var cav = document.getElementById('canvas');
+            var context = cav.getContext('2d');
+            var pixels = context.getImageData(0, 0, cav.width, cav.height);
+            function hslToRgb(h, s, l) {
+                var r, g, b;
+                if (s == 0) {
+                    r = g = b = l;
+                } else {
+                    var hueToRgb = function hueToRgb(p, q, t) {
+                        if (t < 0) t += 1;
+                        if (t > 1) t -= 1;
+                        if (t < 1 / 6) return p + (q - p) * 6 * t;
+                        if (t < 1 / 2) return q;
+                        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                        return p;
+                    }
+                    var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                    var p = 2 * l - q;
+                    r = hueToRgb(p, q, h + 1 / 3);
+                    g = hueToRgb(p, q, h);
+                    b = hueToRgb(p, q, h - 1 / 3);
+                }
+                return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+            }
+            function rgbToHsl(r, g, b) {
+                r /= 255,
+                g /= 255,
+                b /= 255;
+                var max = Math.max(r, g, b),
+                min = Math.min(r, g, b);
+                var h, s, l = (max + min) / 2;
+
+                if (max == min) {
+                    h = s = 0;
+                } else {
+                    var d = max - min;
+                    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                    switch (max) {
+                    case r:
+                        h = (g - b) / d + (g < b ? 6 : 0);
+                        break;
+                    case g:
+                        h = (b - r) / d + 2;
+                        break;
+                    case b:
+                        h = (r - g) / d + 4;
+                        break;
+                    }
+                    h /= 6;
+                }
+                return [h, s, l];
+            }
+            function getH(rgb) {
+                var hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+                return hsl[0];
+            }
+            function getColor(pixels, index) {
+                if (typeof box != "number") {
+                    box = 1;
+                }
+//                var row = (index % (pixels.height / box));
+//                var col = Math.floor(index / (pixels.height / box));
+                var row = Math.floor(index / (pixels.width / box));
+                var col = (index % (pixels.width / box));
+                row *= box;
+                col *= box;
+                var data = pixels.data;
+                var index = (row * pixels.width + col) * 4;
+                return [data[index], data[index + 1], data[index + 2], data[index + 3]];
+            }
+            function setColor(pixels, index, color) {
+                if (typeof box != "number") {
+                    box = 1;
+                }
+//         		  var row = (index % (pixels.height / box));
+//                var col = Math.floor(index / (pixels.height / box));
+                var row = Math.floor(index / (pixels.width / box));
+                var col = (index % (pixels.width / box));
+                row *= box;
+                col *= box;
+                var data = pixels.data;
+                var index = (row * pixels.width + col) * 4;
+                var boxIndex;
+                for (var i = 0; i < box; ++i) {
+                    for (var j = 0; j < box; ++j) {
+                        boxIndex = index + (i * pixels.width + j) * 4;
+                        data[boxIndex] = color[0];
+                        data[boxIndex + 1] = color[1];
+                        data[boxIndex + 2] = color[2];
+                        data[boxIndex + 3] = color[3];
+                    }
+                }
+            }
+            function swapColor(pixels, one, two) {
+                var tempColor = getColor(pixels, one);
+                setColor(pixels, one, getColor(pixels, two));
+                setColor(pixels, two, tempColor);
+            }
+            function init(pixels) {
+                var h = 0;
+                var step = 1 / pixels.width / pixels.height * Math.pow(box, 2);
+                for (var i = 0,
+                num = pixels.width * pixels.height / Math.pow(box, 2); i < num; ++i) {
+                    var rgb = hslToRgb(h, 1, 0.5);
+                    h += step;
+                    rgb.push(255);
+                    setColor(pixels, i, rgb);
+                }
+                context.putImageData(pixels, 0, 0);
+            }
+            function shuffle(pixels) {
+                var num = pixels.width * pixels.height / Math.pow(box, 2);
+                var randIndex;
+                if (typeof box != "number") {
+                    box = 1;
+                }
+                for (var i = 0; i < num; ++i) {
+                    randIndex = Math.floor(Math.random() * num);
+                    swapColor(pixels, i, randIndex);
+                }
+                context.putImageData(pixels, 0, 0);
+            }
+            var insertSort = (function(pixels, beg, end) {
+                var dt = new Date();
+                var cur = beg + 1;
+                return function() {
+                    if (cur == end) {
+                        context.putImageData(pixels, 0, 0);
+                        alert("排序完成!");
+                        for (var i = 0; i != this.elements.length; ++i) {
+                            this.elements[i].style.backgroundColor = "";
+                            this.elements[i].disabled = false;
+                        }
+                        return;
+                    }
+                    var tempColor = getColor(pixels, cur);
+                    var tempH = getH(tempColor);
+                    var rgbJ = getColor(pixels, cur - 1);
+                    if (tempH < getH(rgbJ)) {
+                        for (var j = cur - 1; j >= 0; --j) {
+                            rgbJ = getColor(pixels, j);
+                            if (tempH < getH(rgbJ)) {
+                                setColor(pixels, j + 1, rgbJ);
+                            } else {
+                                break;
+                            }
+                        }
+                        setColor(pixels, j + 1, tempColor);
+                    }++cur;
+                    var loop = arguments.callee.bind(this);
+                    var new_date = new Date();
+                    if (new_date - dt >= 0) {
+                        context.putImageData(pixels, 0, 0);
+                        dt = new_date;
+                    }
+                    requestAnimationFrame(loop);
+                }
+            });
+            var bubbleSort = (function(pixels, beg, end) {
+                var dt = new Date();
+                var change = 0;
+                var cur = end - 1;
+                return function() {
+                    if (cur < 0 || change != 0) {
+                        context.putImageData(pixels, 0, 0);
+                        alert("排序完成!");
+                        for (var i = 0; i != this.elements.length; ++i) {
+                            this.elements[i].style.backgroundColor = "";
+                            this.elements[i].disabled = false;
+                        }
+                        return;
+                    }
+                    change = 1;
+                    var tempColor = getColor(pixels, cur);
+                    var tempH = getH(tempColor);
+                    for (var j = 0; j < cur; ++j) {
+                        if (getH(getColor(pixels, j)) > getH(getColor(pixels, j + 1))) {
+                            change = 0;
+                            swapColor(pixels, j, j + 1);
+                        }
+                    }--cur;
+                    var loop = arguments.callee.bind(this);
+                    var new_date = new Date();
+                    if (new_date - dt >= 40) {
+                        context.putImageData(pixels, 0, 0);
+                        dt = new_date;
+                    }
+                    requestAnimationFrame(loop);
+                }
+            });
+            var shellSort = (function(pixels, beg, end) {
+                var dt = new Date();
+                var fraction = Math.floor(end / 2);
+                return function() {
+                    if (fraction <= 0) {
+                        context.putImageData(pixels, 0, 0);
+                        alert("排序完成!");
+                        for (var i = 0; i != this.elements.length; ++i) {
+                            this.elements[i].style.backgroundColor = "";
+                            this.elements[i].disabled = false;
+                        }
+                        return;
+                    }
+                    for (var j = fraction; j < end; ++j) {
+                        for (var k = j - fraction; k >= 0 && getH(getColor(pixels, k)) > getH(getColor(pixels, fraction + k)); k -= fraction) {
+                            swapColor(pixels, k, fraction + k);
+                        }
+                    }
+                    fraction = Math.floor(fraction / 2);
+                    var loop = arguments.callee.bind(this);
+                    var new_date = new Date();
+                    if (new_date - dt >= 40) {
+                        context.putImageData(pixels, 0, 0);
+                        dt = new_date;
+                    }
+                    requestAnimationFrame(loop);
+                }
+            });
+            var quickSort = (function() {
+                var dt = new Date();
+                var stack_cnt = 1;
+                function PARTITION(pixels, beg, end) {
+                    var i = beg - 1;
+                    var j = beg;
+                    var m = Math.floor((beg + end) / 2);
+                    swapColor(pixels, m, end - 1);
+                    m = end - 1;
+                    var pivot = getH(getColor(pixels, m));
+                    for (; j < m; ++j) {
+                        if (getH(getColor(pixels, j)) < pivot) {++i;
+                            swapColor(pixels, i, j);
+                        }
+                    }++i;
+                    swapColor(pixels, i, m);
+                    return i;
+                }
+                return function(pixels, beg, end) {
+                    if (end - beg <= 1) {--stack_cnt;
+                        if (stack_cnt == 0) {
+                            context.putImageData(pixels, 0, 0);
+                            alert("排序完成!");
+                            for (var i = 0; i != this.elements.length; ++i) {
+                                this.elements[i].style.backgroundColor = "";
+                                this.elements[i].disabled = false;
+                            }
+                        }
+                        return;
+                    }
+                    var r = PARTITION(pixels, beg, end);
+                    var new_date = new Date();
+                    if (new_date - dt >= 40) {
+                        context.putImageData(pixels, 0, 0);
+                        dt = new_date;
+                    }
+                    var func = arguments.callee.bind(this);
+                    var loop = function() {
+                        func(pixels, beg, r);
+                        func(pixels, r + 1, end);
+                    }
+                    requestAnimationFrame(loop);
+                    stack_cnt += 2; --stack_cnt;
+                }
+            })();
+
+            init(pixels);
+            context.putImageData(pixels, 0, 0);
+            document.body.onload = function() {
+                var form = document.querySelector("form");
+                form.addEventListener("mouseup",
+                function(event) {
+                    switch (event.target.tagName) {
+                    case "INPUT":
+                        if (event.target.id == "init") {
+							box=1;
+                            init(pixels);
+                        } else if (event.target.id == "shuffle") {
+                            shuffle(pixels);
+                        } else if (event.target.id == "insert") {
+                            func = insertSort(pixels, 0, pixels.width * pixels.height / Math.pow(box, 2));
+                            func.call(this);
+                        } else if (event.target.id == "bubble") {
+                            func = bubbleSort(pixels, 0, pixels.width * pixels.height / Math.pow(box, 2));
+                            func.call(this);
+                        } else if (event.target.id == "shell") {
+                            func = shellSort(pixels, 0, pixels.width * pixels.height / Math.pow(box, 2));
+                            func.call(this);
+                        } else if (event.target.id == "quick") {
+                            quickSort.call(this, pixels, 0, pixels.width * pixels.height / Math.pow(box, 2));
+                        } else if (event.target.id == "to5x") {
+                            box = 5;
+                            init(pixels);
+                        } else if (event.target.id == "to25x") {
+                            box = 25;
+                            init(pixels);
+                        } else if (event.target.id == "to50x") {
+                            box = 50;
+                            init(pixels);
+                        }
+                        break;
+                    }
+                },false)
+            }
+        </script>
+        <div>
+            <p>
+                请先选择放大倍数（to5x,to25x,to50x）,默认为1x（请仅在快速排序时使用）
+                <br/>
+                点击rest初始化，点击shuffle将颜色打乱
+                <br/>
+                颜色打乱后可选择三种排序方法一种进行排序
+                <br/>
+                在排序过程中请不要点击其他按钮！并请在排序完成提示框出现后再进行其他操作！
+                <br/>
+                出现问题可刷新后重新操作
+            </p>
+        </div>
+    </body>
+
+</html>
